@@ -69,8 +69,7 @@ public class EnvironmentDepthAccess : MonoBehaviour
         if (_requestsCB == null || _resultsCB == null)
         {
             _requestsCB = new ComputeBuffer(size, Marshal.SizeOf<Vector2>(), ComputeBufferType.Structured);
-            _resultsCB = new ComputeBuffer(size, Marshal.SizeOf<Vector3>(),
-                ComputeBufferType.Structured);
+            _resultsCB = new ComputeBuffer(size, Marshal.SizeOf<Vector3>(), ComputeBufferType.Structured);
         }
 
         return (_requestsCB, _resultsCB);

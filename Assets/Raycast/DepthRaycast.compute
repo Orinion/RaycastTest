@@ -50,7 +50,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     const uint slice = 0;
 
     float2 raycastPosition = RaycastRequests[id.x];
-
+    
     float envDepth = SampleEnvironmentDepth(raycastPosition, slice);
     float3 worldPos = ComputeWorldSpacePosition(raycastPosition, envDepth, unity_StereoMatrixInvVP[slice]);
 

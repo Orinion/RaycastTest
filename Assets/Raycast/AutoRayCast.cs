@@ -24,40 +24,43 @@ public class AutoRayCast : MonoBehaviour
 
     [SerializeField]
     TMP_Text textf;
-    [SerializeField]
     EnvironmentDepthAccess depthAccess;
     [SerializeField]
-    Transform hand;
-    [SerializeField]
     Camera cameraT;
+    Transform cameraTransform;
+
+    [SerializeField]
+    Transform Handp;
 
     [SerializeField]
     Material NoOcclusion;
+    Material Occlusion => previewPrefab.GetComponent<MeshRenderer>().material;
 
     [SerializeField]
     GameObject previewPrefab;
     List<GameObject> hits = new();
     GameObject preview = null;
 
-    bool useOcclusoinMaterial = true;
+    bool useOcclusionMaterial = true;
     float last = 0f;
-    private Vector3 goal => cameraT.transform.position + cameraT.transform.forward * 0.3f;
-    private List<Vector2> WorldToVP(List<Vector3> points)  {
-        Matrix4x4 V = Camera.main.worldToCameraMatrix;
-        Matrix4x4 P = Camera.main.projectionMatrix;
-        Matrix4x4 MVP = P * V; // Skipping M, point in world coordinates
-        return points.Select(p => MVP.MultiplyPoint(p))
-            .Select(p => new Vector2(p.x + 1f, p.y + 1f) * 0.5f)
-            .ToList();
+    private Vector3 cameraP => cameraTransform.position;
+    private Vector3 goal => Handp.position + Handp.forward * 0.1f;
+    private Vector3 hitPosition(float returnedDepth, Vector3 requestedPosition) => (requestedPosition - cameraP).normalized * returnedDepth + cameraP;
+
+    private void Start()
+    {
+        cameraTransform = cameraT.transform;
+        depthAccess = GetComponent<EnvironmentDepthAccess>();
     }
+
     private Vector2 WorldToVP(Vector3 pos) => cameraT.WorldToViewportPoint(pos, Camera.MonoOrStereoscopicEye.Left);
 
     private void switchMaterial()
     {
-        var occlusion = previewPrefab.GetComponent<MeshRenderer>().material;
         foreach (var g in hits)
-            g.GetComponent<MeshRenderer>().material = useOcclusoinMaterial ? occlusion : NoOcclusion;
+            g.GetComponent<MeshRenderer>().material = useOcclusionMaterial ? Occlusion : NoOcclusion;
     }
+
     void Update()
     {
         if (OVRInput.GetDown(OVRInput.Button.One))
@@ -73,11 +76,11 @@ public class AutoRayCast : MonoBehaviour
         }
         if (OVRInput.GetDown(OVRInput.Button.Four))
         {
-            useOcclusoinMaterial = !useOcclusoinMaterial;
+            useOcclusionMaterial = !useOcclusionMaterial;
             switchMaterial();
         }
 
-            if (OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger) 
+        if (OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger) 
             && preview == null) {
                 preview = Instantiate(previewPrefab);
         }
@@ -97,41 +100,41 @@ public class AutoRayCast : MonoBehaviour
 
     private void CreateScan()
     {
-        // Raycasting at the controller anchor's position
         var scanCenter = goal;
         int pixel = (int)resolution;
         float diameter = ((int)distance) / 100f; // in cm
-        Vector3 up = cameraT.transform.up;
-        Vector3 right = cameraT.transform.right;
+        Vector3 up = cameraTransform.up;
+        Vector3 right = cameraTransform.right;
 
         float radius = diameter / 2f;
         float rPerPixel = diameter / pixel;
 
         List<Vector3> coords = new();
-        // create list of viewspace vectors
         for (int y = 0; y < pixel; y++)
             for (int x = 0; x < pixel; x++)
             {
                 var xdiff = up * (x * rPerPixel - radius);
                 var ydiff = right * (y * rPerPixel - radius);
                 var wp = scanCenter + xdiff + ydiff;
-                //var vp = WorldToVP(wp);
                 coords.Add(wp);
             }
 
         // Perform ray casts
-        depthAccess.RaycastViewSpaceBlocking(WorldToVP(coords), out List<Vector3> results);
+        depthAccess.RaycastViewSpaceBlocking(coords.Select(c => WorldToVP(c)).ToList(), out List<float> results);
         // Create hit results
-        foreach (var r in results.Skip(3).SkipLast(3))
+        foreach (var it in results.Select((x,i)=> new {depth=x,index=i}))
         {
-            //var p = new Vector3(r.x, 1-r.y, r.z);
-            var g = Instantiate(previewPrefab, r, transform.rotation);
-            if (!useOcclusoinMaterial) g.GetComponent<MeshRenderer>().material = NoOcclusion;
+            var p = hitPosition(it.depth, coords[it.index]);
+
+            // create cube at position
+            var g = Instantiate(previewPrefab, p, transform.rotation);
+            if (!useOcclusionMaterial) g.GetComponent<MeshRenderer>().material = NoOcclusion;
             g.transform.localScale = Vector3.one * 0.01f;
             hits.Add(g);
         }
 
-        last = Vector3.Distance(results.First(), cameraT.transform.position);
+        last = results.First();
+        // hide preview
         Destroy(preview);
         preview = null;
     }
@@ -143,10 +146,19 @@ public class AutoRayCast : MonoBehaviour
         // to viewspace vector
         var viewSpaceCoordinate = WorldToVP(worldCenter);
         // Perform ray cast
-        var r = depthAccess.RaycastViewSpaceBlocking(viewSpaceCoordinate);
+        var depth = depthAccess.RaycastViewSpaceBlocking(viewSpaceCoordinate);
+        // compute hit position using depth and requested position
+        var hit = hitPosition(depth, worldCenter);
 
-        last = Vector3.Distance(r, cameraT.transform.position);
-        hits.Add(Instantiate(previewPrefab, r, transform.rotation));
+        last = depth;
+        // create cube at position
+        var g = Instantiate(previewPrefab, hit, transform.rotation);
+        g.transform.localScale = Vector3.one * 0.03f;
+        if (!useOcclusionMaterial) 
+            g.GetComponent<MeshRenderer>().material = NoOcclusion;
+        // save for cleanup
+        hits.Add(g);
+        // hide preview
         Destroy(preview);
         preview = null;
     }

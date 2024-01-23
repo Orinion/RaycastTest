@@ -1,15 +1,13 @@
 #pragma kernel CSMain
-// Source: https://github.com/oculus-samples/Unity-DepthAPI/issues/16
+// Based on comment by TudorJude: https://github.com/oculus-samples/Unity-DepthAPI/issues/16#issuecomment-1863006589
 
 StructuredBuffer<float2> RaycastRequests;
-RWStructuredBuffer<float3> RaycastResults;
+RWStructuredBuffer<float> RaycastResults;
 
 Texture2DArray<float> _EnvironmentDepthTexture;
 
 float4x4 _EnvironmentDepthReprojectionMatrices[2];
 float4 _EnvironmentDepthZBufferParams;
-float4 _ZBufferParams;
-float4x4 unity_StereoMatrixInvVP[2];
 
 float SampleEnvironmentDepth(const float2 uv, const int slice)
 {
@@ -17,30 +15,13 @@ float SampleEnvironmentDepth(const float2 uv, const int slice)
       mul(_EnvironmentDepthReprojectionMatrices[slice], float4(uv.x, uv.y, 0.0, 1.0));
     const uint3 depthtextureuv = uint3(reprojectedUV.x * 2000, reprojectedUV.y * 2000, 0);
 
-  // depth z buffer value
+    // depth z buffer value
     const float inputDepthEye = _EnvironmentDepthTexture[depthtextureuv];
 
     const float inputDepthNdc = inputDepthEye * 2.0 - 1.0;
-    const float envLinearDepth = (1.0f / (inputDepthNdc + _EnvironmentDepthZBufferParams.y)) * _EnvironmentDepthZBufferParams.x;
-
-  // depth camera z buffer
-    float envDepth = (1 - envLinearDepth * _ZBufferParams.w) / (envLinearDepth * _ZBufferParams.z);
-
-    return envDepth;
-}
-
-float4 ComputeClipSpacePosition(float2 positionNDC, float deviceDepth)
-{
-    float4 positionCS = float4(positionNDC * 2.0 - 1.0, deviceDepth, 1.0);
-
-    return positionCS;
-}
-
-float3 ComputeWorldSpacePosition(float2 positionNDC, float deviceDepth, float4x4 invViewProjMatrix)
-{
-    float4 positionCS = ComputeClipSpacePosition(positionNDC, deviceDepth);
-    float4 hpositionWS = mul(invViewProjMatrix, positionCS);
-    return hpositionWS.xyz / hpositionWS.w;
+    float envLinearDepth = (1.0f / (inputDepthNdc + _EnvironmentDepthZBufferParams.y)) * _EnvironmentDepthZBufferParams.x;
+    
+    return envLinearDepth;
 }
 
 // depending on the use case workgroup amount can be optimized for better performance
@@ -52,7 +33,5 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     float2 raycastPosition = RaycastRequests[id.x];
     
     float envDepth = SampleEnvironmentDepth(raycastPosition, slice);
-    float3 worldPos = ComputeWorldSpacePosition(raycastPosition, envDepth, unity_StereoMatrixInvVP[slice]);
-
-    RaycastResults[id.x] = worldPos;
+    RaycastResults[id.x] = envDepth;
 }

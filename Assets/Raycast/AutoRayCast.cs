@@ -24,11 +24,13 @@ public class AutoRayCast : MonoBehaviour
 
     [SerializeField]
     TMP_Text textf;
-    [SerializeField]
     EnvironmentDepthAccess depthAccess;
     [SerializeField]
     Camera cameraT;
     Transform cameraTransform;
+
+    [SerializeField]
+    Transform Handp;
 
     [SerializeField]
     Material NoOcclusion;
@@ -39,16 +41,16 @@ public class AutoRayCast : MonoBehaviour
     List<GameObject> hits = new();
     GameObject preview = null;
 
-    bool useOcclusoinMaterial = true;
+    bool useOcclusionMaterial = true;
     float last = 0f;
     private Vector3 cameraP => cameraTransform.position;
-    private Vector3 goalCenter => cameraP + cameraTransform.forward * 100f;
-    private Vector3 goal => cameraP + cameraTransform.forward * 0.5f;
+    private Vector3 goal => Handp.position + Handp.forward * 0.1f;
     private Vector3 hitPosition(float returnedDepth, Vector3 requestedPosition) => (requestedPosition - cameraP).normalized * returnedDepth + cameraP;
 
     private void Start()
     {
         cameraTransform = cameraT.transform;
+        depthAccess = GetComponent<EnvironmentDepthAccess>();
     }
 
     private Vector2 WorldToVP(Vector3 pos) => cameraT.WorldToViewportPoint(pos, Camera.MonoOrStereoscopicEye.Left);
@@ -56,7 +58,7 @@ public class AutoRayCast : MonoBehaviour
     private void switchMaterial()
     {
         foreach (var g in hits)
-            g.GetComponent<MeshRenderer>().material = useOcclusoinMaterial ? Occlusion : NoOcclusion;
+            g.GetComponent<MeshRenderer>().material = useOcclusionMaterial ? Occlusion : NoOcclusion;
     }
 
     void Update()
@@ -74,11 +76,11 @@ public class AutoRayCast : MonoBehaviour
         }
         if (OVRInput.GetDown(OVRInput.Button.Four))
         {
-            useOcclusoinMaterial = !useOcclusoinMaterial;
+            useOcclusionMaterial = !useOcclusionMaterial;
             switchMaterial();
         }
 
-            if (OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger) 
+        if (OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger) 
             && preview == null) {
                 preview = Instantiate(previewPrefab);
         }
@@ -98,7 +100,6 @@ public class AutoRayCast : MonoBehaviour
 
     private void CreateScan()
     {
-        // Raycasting at the controller anchor's position
         var scanCenter = goal;
         int pixel = (int)resolution;
         float diameter = ((int)distance) / 100f; // in cm
@@ -109,14 +110,12 @@ public class AutoRayCast : MonoBehaviour
         float rPerPixel = diameter / pixel;
 
         List<Vector3> coords = new();
-        // create list of viewspace vectors
         for (int y = 0; y < pixel; y++)
             for (int x = 0; x < pixel; x++)
             {
                 var xdiff = up * (x * rPerPixel - radius);
                 var ydiff = right * (y * rPerPixel - radius);
                 var wp = scanCenter + xdiff + ydiff;
-                // increase distance for accrucy
                 coords.Add(wp);
             }
 
@@ -126,13 +125,16 @@ public class AutoRayCast : MonoBehaviour
         foreach (var it in results.Select((x,i)=> new {depth=x,index=i}))
         {
             var p = hitPosition(it.depth, coords[it.index]);
+
+            // create cube at position
             var g = Instantiate(previewPrefab, p, transform.rotation);
-            if (!useOcclusoinMaterial) g.GetComponent<MeshRenderer>().material = NoOcclusion;
+            if (!useOcclusionMaterial) g.GetComponent<MeshRenderer>().material = NoOcclusion;
             g.transform.localScale = Vector3.one * 0.01f;
             hits.Add(g);
         }
 
         last = results.First();
+        // hide preview
         Destroy(preview);
         preview = null;
     }
@@ -140,18 +142,23 @@ public class AutoRayCast : MonoBehaviour
     private void CreateSingleScan()
     {
         // Raycasting at the controller anchor's position
-        var worldCenter = goalCenter;
+        var worldCenter = goal;
         // to viewspace vector
         var viewSpaceCoordinate = WorldToVP(worldCenter);
         // Perform ray cast
         var depth = depthAccess.RaycastViewSpaceBlocking(viewSpaceCoordinate);
+        // compute hit position using depth and requested position
         var hit = hitPosition(depth, worldCenter);
+
         last = depth;
+        // create cube at position
         var g = Instantiate(previewPrefab, hit, transform.rotation);
-        g.transform.localScale = Vector3.one * 0.05f;
-        if (!useOcclusoinMaterial) 
+        g.transform.localScale = Vector3.one * 0.03f;
+        if (!useOcclusionMaterial) 
             g.GetComponent<MeshRenderer>().material = NoOcclusion;
+        // save for cleanup
         hits.Add(g);
+        // hide preview
         Destroy(preview);
         preview = null;
     }

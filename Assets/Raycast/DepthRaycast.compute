@@ -2,7 +2,7 @@
 // Source: https://github.com/oculus-samples/Unity-DepthAPI/issues/16
 
 StructuredBuffer<float2> RaycastRequests;
-RWStructuredBuffer<float3> RaycastResults;
+RWStructuredBuffer<float> RaycastResults;
 
 Texture2DArray<float> _EnvironmentDepthTexture;
 
@@ -13,20 +13,20 @@ float4x4 unity_StereoMatrixInvVP[2];
 
 float SampleEnvironmentDepth(const float2 uv, const int slice)
 {
-    const float4 reprojectedUV =
+    float4 reprojectedUV =
       mul(_EnvironmentDepthReprojectionMatrices[slice], float4(uv.x, uv.y, 0.0, 1.0));
-    const uint3 depthtextureuv = uint3(reprojectedUV.x * 2000, reprojectedUV.y * 2000, 0);
+    uint3 depthtextureuv = uint3(reprojectedUV.x * 2000, reprojectedUV.y * 2000, 0);
 
   // depth z buffer value
-    const float inputDepthEye = _EnvironmentDepthTexture[depthtextureuv];
+    float inputDepthEye = _EnvironmentDepthTexture[depthtextureuv];
 
-    const float inputDepthNdc = inputDepthEye * 2.0 - 1.0;
-    const float envLinearDepth = (1.0f / (inputDepthNdc + _EnvironmentDepthZBufferParams.y)) * _EnvironmentDepthZBufferParams.x;
+    float inputDepthNdc = inputDepthEye * 2.0 - 1.0;
+    float envLinearDepth = (1.0f / (inputDepthNdc + _EnvironmentDepthZBufferParams.y)) * _EnvironmentDepthZBufferParams.x;
 
   // depth camera z buffer
-    float envDepth = (1 - envLinearDepth * _ZBufferParams.w) / (envLinearDepth * _ZBufferParams.z);
+    //float envDepth = (1 - envLinearDepth * _ZBufferParams.w) / (envLinearDepth * _ZBufferParams.z);
 
-    return envDepth;
+    return envLinearDepth;
 }
 
 float4 ComputeClipSpacePosition(float2 positionNDC, float deviceDepth)
@@ -52,7 +52,6 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     float2 raycastPosition = RaycastRequests[id.x];
     
     float envDepth = SampleEnvironmentDepth(raycastPosition, slice);
-    float3 worldPos = ComputeWorldSpacePosition(raycastPosition, envDepth, unity_StereoMatrixInvVP[slice]);
-
-    RaycastResults[id.x] = worldPos;
+    //float3 worldPos = ComputeWorldSpacePosition(raycastPosition, envDepth, unity_StereoMatrixInvVP[slice]);
+    RaycastResults[id.x] = envDepth;
 }

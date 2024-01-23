@@ -20,7 +20,7 @@ public class EnvironmentDepthAccess : MonoBehaviour
      * Blocking means that this function will immediately return the result but is performance heavy.
      * List is expected to be the size of the requested coordinates.
      */
-    public void RaycastViewSpaceBlocking(List<Vector2> viewSpaceCoords, out List<Vector3> result)
+    public void RaycastViewSpaceBlocking(List<Vector2> viewSpaceCoords, out List<float> result)
     {
         result = DispatchCompute(viewSpaceCoords);
     }
@@ -29,14 +29,14 @@ public class EnvironmentDepthAccess : MonoBehaviour
      * Perform a raycast at a view space coordinate and return the result.
      * Blocking means that this function will immediately return the result but is performance heavy.
      */
-    public Vector3 RaycastViewSpaceBlocking(Vector2 viewSpaceCoord)
+    public float RaycastViewSpaceBlocking(Vector2 viewSpaceCoord)
     {
         var depthRaycastResult = DispatchCompute(new List<Vector2>() { viewSpaceCoord });
         return depthRaycastResult[0];
     }
 
 
-    private List<Vector3> DispatchCompute(List<Vector2> requestedPositions)
+    private List<float> DispatchCompute(List<Vector2> requestedPositions)
     {
         UpdateCurrentRenderingState();
 
@@ -50,7 +50,7 @@ public class EnvironmentDepthAccess : MonoBehaviour
 
         _computeShader.Dispatch(0, count, 1, 1);
 
-        var raycastResults = new Vector3[count];
+        var raycastResults = new float[count];
         resultsCB.GetData(raycastResults);
 
         return raycastResults.ToList();
@@ -69,7 +69,7 @@ public class EnvironmentDepthAccess : MonoBehaviour
         if (_requestsCB == null || _resultsCB == null)
         {
             _requestsCB = new ComputeBuffer(size, Marshal.SizeOf<Vector2>(), ComputeBufferType.Structured);
-            _resultsCB = new ComputeBuffer(size, Marshal.SizeOf<Vector3>(), ComputeBufferType.Structured);
+            _resultsCB = new ComputeBuffer(size, Marshal.SizeOf<float>(), ComputeBufferType.Structured);
         }
 
         return (_requestsCB, _resultsCB);

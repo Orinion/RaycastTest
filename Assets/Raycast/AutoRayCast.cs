@@ -30,6 +30,7 @@ public class AutoRayCast : MonoBehaviour
     Transform hand;
     [SerializeField]
     Camera cameraT;
+    Transform cameraTransform;
 
     [SerializeField]
     Material NoOcclusion;
@@ -41,7 +42,16 @@ public class AutoRayCast : MonoBehaviour
 
     bool useOcclusoinMaterial = true;
     float last = 0f;
-    private Vector3 goal => cameraT.transform.position + cameraT.transform.forward * 0.3f;
+    private Vector3 cameraP => cameraTransform.position;
+    private Vector3 goalCenter => cameraP + cameraTransform.forward * 100f;
+    private Vector3 goal => cameraP + cameraTransform.forward * 0.5f;
+    private Vector3 goalD(float depth, Vector3 req) => (req - cameraP).normalized * depth + cameraP;
+
+    private void Start()
+    {
+        cameraTransform = cameraT.transform;
+    }
+
     private List<Vector2> WorldToVP(List<Vector3> points)  {
         Matrix4x4 V = Camera.main.worldToCameraMatrix;
         Matrix4x4 P = Camera.main.projectionMatrix;
@@ -101,8 +111,8 @@ public class AutoRayCast : MonoBehaviour
         var scanCenter = goal;
         int pixel = (int)resolution;
         float diameter = ((int)distance) / 100f; // in cm
-        Vector3 up = cameraT.transform.up;
-        Vector3 right = cameraT.transform.right;
+        Vector3 up = cameraTransform.up;
+        Vector3 right = cameraTransform.right;
 
         float radius = diameter / 2f;
         float rPerPixel = diameter / pixel;
@@ -115,23 +125,24 @@ public class AutoRayCast : MonoBehaviour
                 var xdiff = up * (x * rPerPixel - radius);
                 var ydiff = right * (y * rPerPixel - radius);
                 var wp = scanCenter + xdiff + ydiff;
-                //var vp = WorldToVP(wp);
+                // increase distance for accrucy
+                var distantWP = (wp - cameraP).normalized * 100f + cameraP;
                 coords.Add(wp);
             }
 
         // Perform ray casts
-        depthAccess.RaycastViewSpaceBlocking(WorldToVP(coords), out List<Vector3> results);
+        depthAccess.RaycastViewSpaceBlocking(WorldToVP(coords), out List<float> results);
         // Create hit results
-        foreach (var r in results.Skip(3).SkipLast(3))
+        foreach (var it in results.Select((x,i)=> new {depth=x,index=i}).Skip(3).SkipLast(3))
         {
-            //var p = new Vector3(r.x, 1-r.y, r.z);
-            var g = Instantiate(previewPrefab, r, transform.rotation);
+            var p = goalD(it.depth, coords[it.index]);
+            var g = Instantiate(previewPrefab, p, transform.rotation);
             if (!useOcclusoinMaterial) g.GetComponent<MeshRenderer>().material = NoOcclusion;
             g.transform.localScale = Vector3.one * 0.01f;
             hits.Add(g);
         }
 
-        last = Vector3.Distance(results.First(), cameraT.transform.position);
+        last = results.First();
         Destroy(preview);
         preview = null;
     }
@@ -139,14 +150,17 @@ public class AutoRayCast : MonoBehaviour
     private void CreateSingleScan()
     {
         // Raycasting at the controller anchor's position
-        var worldCenter = goal;
+        var worldCenter = goalCenter;
         // to viewspace vector
         var viewSpaceCoordinate = WorldToVP(worldCenter);
         // Perform ray cast
-        var r = depthAccess.RaycastViewSpaceBlocking(viewSpaceCoordinate);
-
-        last = Vector3.Distance(r, cameraT.transform.position);
-        hits.Add(Instantiate(previewPrefab, r, transform.rotation));
+        var depth = depthAccess.RaycastViewSpaceBlocking(viewSpaceCoordinate);
+        var hit = goalD(depth, worldCenter);
+        last = depth;
+        var g = Instantiate(previewPrefab, hit, transform.rotation);
+        if (!useOcclusoinMaterial) 
+            g.GetComponent<MeshRenderer>().material = NoOcclusion;
+        hits.Add(g);
         Destroy(preview);
         preview = null;
     }

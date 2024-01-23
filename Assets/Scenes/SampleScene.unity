@@ -697,7 +697,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0.2879734, w: 0}
+  m_margin: {x: 0, y: 0, z: -0.08241081, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   _SortingLayer: 0
@@ -716,7 +716,7 @@ MeshRenderer:
   m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 0
-  m_DynamicOccludee: 1
+  m_DynamicOccludee: 0
   m_StaticShadowCaster: 0
   m_MotionVectors: 1
   m_LightProbeUsage: 1
@@ -943,7 +943,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1729813804}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.77}
+  m_LocalPosition: {x: 0, y: 0, z: 0.1}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -962,14 +962,14 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1729813804}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 0, g: 0, b: 0, a: 1}
-  m_RaycastTarget: 1
+  m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 0
   m_OnCullStateChanged:
@@ -992,7 +992,7 @@ CanvasRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1729813804}
-  m_CullTransparentMesh: 1
+  m_CullTransparentMesh: 0
 --- !u!1 &1889109015
 GameObject:
   m_ObjectHideFlags: 0
@@ -1129,8 +1129,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 924ff9fa3136c0042b2b747a76a4814a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  depthAccess: {fileID: 2023565377}
-  hand: {fileID: 680647692}
-  cameraT: {fileID: 911958024}
-  previewPrefab: {fileID: 8421371397774871865, guid: 0aecedc0b83550b40952e34509777d12, type: 3}
   textf: {fileID: 993301039}
+  cameraT: {fileID: 911958024}
+  Handp: {fileID: 680647692}
+  NoOcclusion: {fileID: 2100000, guid: ca9d86e0e8f3dfe4e9e9fff7f8e7b3d0, type: 2}
+  previewPrefab: {fileID: 8421371397774871865, guid: 0aecedc0b83550b40952e34509777d12, type: 3}

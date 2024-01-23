@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using UnityEditor;
 using UnityEngine;
 using System;
 using TMPro;
@@ -12,7 +11,7 @@ public class AutoRayCast : MonoBehaviour
         single = 1,
         low = 10,
         mid = 50,
-        high = 200
+        high = 100
     }
     public enum ScanSize : int
     {
@@ -24,21 +23,43 @@ public class AutoRayCast : MonoBehaviour
     private ScanSize distance = ScanSize.small;
 
     [SerializeField]
-    private EnvironmentDepthAccess depthAccess;
-    [SerializeField]
-    Transform hand;
+    TMP_Text textf;
+    EnvironmentDepthAccess depthAccess;
     [SerializeField]
     Camera cameraT;
+    Transform cameraTransform;
+
+    [SerializeField]
+    Transform Handp;
+
+    [SerializeField]
+    Material NoOcclusion;
+    Material Occlusion => previewPrefab.GetComponent<MeshRenderer>().material;
+
     [SerializeField]
     GameObject previewPrefab;
+    List<GameObject> hits = new();
     GameObject preview = null;
-    [SerializeField]
-    TMP_Text textf;
 
+    bool useOcclusionMaterial = true;
     float last = 0f;
-    private Vector3 goal => hand.position + hand.forward * 0.1f;
+    private Vector3 cameraP => cameraTransform.position;
+    private Vector3 goal => Handp.position + Handp.forward * 0.2f;
+    private Vector3 hitPosition(float returnedDepth, Vector3 requestedPosition) => (requestedPosition - cameraP).normalized * returnedDepth + cameraP;
 
-    private Vector3 WorldTo2d(Vector3 pos) => cameraT.WorldToViewportPoint(pos, Camera.MonoOrStereoscopicEye.Left);
+    private void Start()
+    {
+        cameraTransform = cameraT.transform;
+        depthAccess = GetComponent<EnvironmentDepthAccess>();
+    }
+
+    private Vector2 WorldToVP(Vector3 pos) => cameraT.WorldToViewportPoint(pos, Camera.MonoOrStereoscopicEye.Left);
+
+    private void switchMaterial()
+    {
+        foreach (var g in hits)
+            g.GetComponent<MeshRenderer>().material = useOcclusionMaterial ? Occlusion : NoOcclusion;
+    }
 
     void Update()
     {
@@ -48,13 +69,27 @@ public class AutoRayCast : MonoBehaviour
         if (OVRInput.GetDown(OVRInput.Button.Two))
             distance = distance.Next();
 
-        if (OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger) 
-            && preview == null) {
-                preview = Instantiate(previewPrefab, transform);
+        if (OVRInput.GetDown(OVRInput.Button.Three))
+        {
+            foreach (var hit in hits)
+                Destroy(hit);
+            hits.Clear();
+        }
+        if (OVRInput.GetDown(OVRInput.Button.Four))
+        {
+            useOcclusionMaterial = !useOcclusionMaterial;
+            switchMaterial();
+        }
+
+        if (OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger)
+            && preview == null)
+        {
+            preview = Instantiate(previewPrefab);
         }
         if (preview)
-            preview.transform.localPosition = goal;
-        if(OVRInput.GetUp(OVRInput.Button.SecondaryIndexTrigger))
+            preview.transform.position = goal;
+
+        if (OVRInput.GetUp(OVRInput.Button.SecondaryIndexTrigger))
         {
             if (resolution == Resolution.single)
                 CreateSingleScan();
@@ -67,39 +102,43 @@ public class AutoRayCast : MonoBehaviour
 
     private void CreateScan()
     {
-        // Raycasting at the controller anchor's position
         var scanCenter = goal;
-        List<Vector2> coords = new List<Vector2>();
         int pixel = (int)resolution;
         float diameter = ((int)distance) / 100f; // in cm
-        Vector3 up = cameraT.transform.up;
-        Vector3 right = cameraT.transform.right;
+        Vector3 up = cameraTransform.up;
+        Vector3 right = cameraTransform.right;
 
         float radius = diameter / 2f;
         float rPerPixel = diameter / pixel;
 
-        // create list of viewspace vectors
+        List<Vector3> coords = new();
         for (int y = 0; y < pixel; y++)
             for (int x = 0; x < pixel; x++)
             {
                 var xdiff = up * (x * rPerPixel - radius);
                 var ydiff = right * (y * rPerPixel - radius);
                 var wp = scanCenter + xdiff + ydiff;
-                coords.Add(WorldTo2d(wp));
+                coords.Add(wp);
             }
 
         // Perform ray casts
-        depthAccess.RaycastViewSpaceBlocking(coords, out List<Vector3> results);
+        depthAccess.RaycastViewSpaceBlocking(coords.Select(c => WorldToVP(c)).ToList(), out List<float> results);
+        // Create hit results
+        foreach (var it in results.Select((x, i) => new { depth = x, index = i }))
+        {
+            var p = hitPosition(it.depth, coords[it.index]);
 
-        var vs = results.Select(p => {
-            Debug.Log(p);
-            if (float.IsNaN(p.x) || float.IsInfinity(p.x)) return null;
-            return Instantiate(preview, p, transform.rotation);
-        });
+            // create cube at position
+            var g = Instantiate(previewPrefab, p, transform.rotation);
+            if (!useOcclusionMaterial) g.GetComponent<MeshRenderer>().material = NoOcclusion;
+            g.transform.localScale = Vector3.one * 0.01f;
+            hits.Add(g);
+        }
 
+        last = results.First();
+        // hide preview
         Destroy(preview);
         preview = null;
-        Debug.Log(GetInfoText());
     }
 
     private void CreateSingleScan()
@@ -107,32 +146,37 @@ public class AutoRayCast : MonoBehaviour
         // Raycasting at the controller anchor's position
         var worldCenter = goal;
         // to viewspace vector
-        var viewSpaceCoordinate = WorldTo2d(worldCenter);
+        var viewSpaceCoordinate = WorldToVP(worldCenter);
         // Perform ray cast
-        var r = depthAccess.RaycastViewSpaceBlocking(viewSpaceCoordinate);
-        // relative
+        var depth = depthAccess.RaycastViewSpaceBlocking(viewSpaceCoordinate);
+        // compute hit position using depth and requested position
+        var hit = hitPosition(depth, worldCenter);
 
-        last = r.x;
-
+        last = depth;
+        // create cube at position
+        var g = Instantiate(previewPrefab, hit, transform.rotation);
+        g.transform.localScale = Vector3.one * 0.03f;
+        if (!useOcclusionMaterial)
+            g.GetComponent<MeshRenderer>().material = NoOcclusion;
+        // save for cleanup
+        hits.Add(g);
+        // hide preview
         Destroy(preview);
         preview = null;
-        Debug.Log(GetInfoText());
     }
 
     public string GetInfoText()
     {
-        return "Scan " + " Res: " + resolution.ToString() + " Size: " + ((int)distance) + "cm" + "\n" + last.ToString();
+        return "Res: " + resolution.ToString()
+            + (resolution == Resolution.single ? "" : " Size: " + ((int)distance) + "cm")
+            + "\n" + last.ToString();
     }
-
 }
 
 public static class Extensions
 {
-
     public static T Next<T>(this T src) where T : struct
     {
-        if (!typeof(T).IsEnum) throw new ArgumentException(String.Format("Argument {0} is not an Enum", typeof(T).FullName));
-
         T[] Arr = (T[])Enum.GetValues(src.GetType());
         int j = Array.IndexOf<T>(Arr, src) + 1;
         return (Arr.Length == j) ? Arr[0] : Arr[j];

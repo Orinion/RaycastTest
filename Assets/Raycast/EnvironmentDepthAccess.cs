@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
+// Based on comment by TudorJude: https://github.com/oculus-samples/Unity-DepthAPI/issues/16#issuecomment-1863006589
 public class EnvironmentDepthAccess : MonoBehaviour
 {
     private static readonly int raycastResultsId = Shader.PropertyToID("RaycastResults");
@@ -83,11 +84,6 @@ public class EnvironmentDepthAccess : MonoBehaviour
             Shader.GetGlobalMatrixArray(EnvironmentDepthTextureProvider.Reprojection3DOFMatricesID));
         _computeShader.SetVector(EnvironmentDepthTextureProvider.ZBufferParamsID,
             Shader.GetGlobalVector(EnvironmentDepthTextureProvider.ZBufferParamsID));
-
-        // See UniversalRenderPipelineCore for property IDs
-        _computeShader.SetVector("_ZBufferParams", Shader.GetGlobalVector("_ZBufferParams"));
-        _computeShader.SetMatrixArray("unity_StereoMatrixInvVP",
-            Shader.GetGlobalMatrixArray("unity_StereoMatrixInvVP"));
     }
 
     private void OnDestroy()

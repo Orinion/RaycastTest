@@ -10,8 +10,8 @@ public class AutoRayCast : MonoBehaviour
     {
         single = 1,
         low = 10,
-        mid = 50,
-        high = 100
+        mid = 30,
+        high = 50
     }
     public enum ScanSize : int
     {
